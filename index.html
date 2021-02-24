@@ -1,0 +1,763 @@
+
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
+    <meta name="description" content="">
+    <meta name="author" content="">
+    <link rel="icon" href="/docs/4.0/assets/img/favicons/favicon.ico">
+    <link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/css/bootstrap.min.css" integrity="sha384-JcKb8q3iqJ61gNV9KGb8thSsNjpSL0n8PARn9HuZOnIxN0hoP+VmmDGMN5t9UJ0Z" crossorigin="anonymous">   
+    <title>Title of the document</title>
+    <script src="https://cdn.jsdelivr.net/npm/vue@2.6.12/dist/vue.js"></script>
+    <style>
+        .profit {
+            color: #28a745;
+        }
+        .loss {
+            color: #ff9fa9;
+        }
+        .neutral {
+            color: white;
+        }
+        .watchcard {
+            padding-bottom: 5px;
+            border: solid;
+        }
+        .pointer {
+            cursor: pointer;
+        }
+        .hotlistActive {
+            color: blue;
+        }
+    </style>
+</head>
+
+<body>
+
+
+    <div id="main-app">
+        <div class="container-fluid">
+            <div class="row">
+              <div class="col-md-3 d-none d-md-block bg-dark">
+                  <h3 class="text-white">Positions <input type="text" placeholder="Filter by ticker" class="form-control" v-model="filter.positions"></h3>
+                  <ul class="nav flex-column" v-for="item in filteredPortfolio">
+                    <li class="nav-item watchcard">
+                        <div class="row no-gutters bg-dark text-white">
+                            <div class="col-md-4">
+                                <img :src="imageUrl+item.code+'.png'" class="card-img" :alt="item.code" style="width: 32px; height: 32px" onerror="this.style.display='none'">
+                            </div>
+                            <div class="col-md-4">
+                                <h6 class="card-title">{{showCode(item)}}</h6>
+                            </div>
+                        </div>
+
+                        <div class="row no-gutters bg-dark text-white">
+                            <div class="col-md-5">
+                                <p class="card-text"><button class="btn btn-sm btn-primary" v-on:click="clickBuyOrSell('buy', item.code)">Buy</button></p>
+                            </div>
+                            <div class="col-md-4">
+                                <p class="card-text col-md-4"><button class="btn btn-sm btn-danger" v-on:click="clickBuyOrSell('sell', item.code)">Sell</button></p>
+                            </div>
+                        </div>
+
+
+                        <div class="row no-gutters bg-dark text-white">
+                            <div class="col-md-5">
+                                <p class="card-text">Avg buy</p>
+                            </div>
+                            <div class="col-md-4">
+                                <p class="card-text col-md-4">{{showCurrency(item)}}{{parseFloat(item.averagePrice).toFixed(4)}}</p>
+                            </div>
+                        </div>
+
+                        <div class="row no-gutters bg-dark text-white">
+                            <div class="col-md-5">
+                                <p class="card-text">Owned</p>
+                            </div>
+                            <div class="col-md-4">
+                                <p class="card-text col-md-4">{{item.quantity}}</p>
+                            </div>
+                        </div>
+
+                        <div class="row no-gutters bg-dark text-white">
+                            <div class="col-md-5">
+                                <p class="card-text">Current price</p>
+                            </div>
+                            <div class="col-md-4">
+                                <p class="card-text col-md-4">{{showCurrency(item)}}{{findCurrentPriceFromWS(item)}}</p>
+                            </div>
+                        </div>
+
+                        <div class="row no-gutters bg-dark text-white">
+                            <div class="col-md-5">
+                                <p class="card-text">Investment</p>
+                            </div>
+                            <div class="col-md-4">
+                                <p class="card-text col-md-4">£{{item.investment}}</p>
+                            </div>
+                        </div>
+
+                        <div class="row no-gutters bg-dark text-white">
+                            <div class="col-md-5">
+                                <p class="card-text">Result</p>
+                            </div>
+                            <div class="col-md-4">
+                                <p :class="'card-text col-md-4 '+sellResultColour(item)">£{{sellResult(item)}}</p>
+                            </div>
+                        </div>
+
+                    </li>
+                  </ul>
+                </div>
+
+                <div class="col-md-3 d-none d-md-block bg-dark">
+                    <h3 class="text-white">Orders <input type="text" placeholder="Filter by ticker" class="form-control" v-model="filter.orders"></h3>
+                    <ul class="nav flex-column" v-for="item in filteredOrders">
+                        <li class="nav-item watchcard">
+                            <div class="row no-gutters bg-dark text-white">
+                                <div class="col-md-4">
+                                    <img :src="imageUrl+item.code+'.png'" class="card-img" :alt="item.code" style="width: 32px; height: 32px" onerror="this.style.display='none'">
+                                </div>
+                                <div class="col-md-4">
+                                    <h6 class="card-title">{{showCode(item)}}</h6>
+                                </div>
+                            </div>
+    
+                            <div class="row no-gutters bg-dark text-white">
+                                <div class="col-md-6">
+                                    <p class="card-text">{{item.type}} {{orderType(item)}}</p>
+                                </div>
+                                <div class="col-md-1">
+                                    <p class="card-text col-md-4">{{showCurrency(item)}}{{item.limitPrice}}</p>
+                                </div>
+                            </div>
+
+                            <div class="row no-gutters bg-dark text-white">
+                                <div class="col-md-6">
+                                    <p class="card-text">Current price</p>
+                                </div>
+                                <div class="col-md-1">
+                                    <p class="card-text col-md-4">{{showCurrency(item)}}{{findCurrentPriceFromWS(item)}}</p>
+                                </div>
+                            </div>
+    
+                            <div class="row no-gutters bg-dark text-white">
+                                <div class="col-md-6">
+                                    <p class="card-text">Qnty</p>
+                                </div>
+                                <div class="col-md-1">
+                                    <p class="card-text col-md-4">{{orderShowQuantity(item)}}</p>
+                                </div>
+                            </div>
+
+                            <div class="row no-gutters bg-dark text-white">
+                                <div class="col-md-6">
+                                    <p class="card-text" v-if="item.quantity < 0">Profit/Loss</p>
+                                    <p class="card-text" v-if="item.quantity > 0">Cost</p>
+                                </div>
+                                <div class="col-md-1">
+                                    <p :class="'card-text col-md-4 '+orderResultColour(item)">£{{orderResult(item)}}</p>
+                                </div>
+                            </div>
+                            
+
+                            <div class="row no-gutters bg-dark text-white">
+                                <div class="col-md-3">
+                                    <button class="btn btn-sm btn-primary" v-on:click="clickBuyOrSell('buy', item.code)">Buy</button>
+                                </div>
+                                <div class="col-md-3">
+                                    <button class="btn btn-sm btn-danger" v-on:click="clickBuyOrSell('sell', item.code)">Sell</button>
+                                </div>
+                                <div class="col-md-3">
+                                    <button class="btn btn-sm btn-danger" v-on:click="showModifyOrder(item)">Mod</button>
+                                </div>
+                                <div class="col-md-3">
+                                    <button class="btn btn-sm btn-danger" v-on:click="deleteOrder(item)">X</button>
+                                </div>
+                            </div>
+    
+                            
+                        </li>
+                      </ul>
+                </div>
+
+                <div class="col-md-2 d-none d-md-block bg-dark">
+                    <h3 class="text-white">Hotlist <input type="text" placeholder="Filter by ticker" class="form-control" v-model="filter.hotlist"></h3>
+                    <div class="text-white text-center">
+                        <span v-on:click="setHotlistFilter('hourly', 1)" :class="'pointer' + hotlistActiveClass('hourly', 1)">1H</span> | <span v-on:click="setHotlistFilter('hourly', 4)" :class="'pointer' + hotlistActiveClass('hourly', 4)">4H</span> | <span v-on:click="setHotlistFilter('hourly', 8)" :class="'pointer' + hotlistActiveClass('hourly', 8)">8H</span> | <span v-on:click="setHotlistFilter('daily', 1)" :class="'pointer' + hotlistActiveClass('daily', 1)">1D</span>  | <span v-on:click="setHotlistFilter('daily', 30)" :class="'pointer' + hotlistActiveClass('daily', 30)">30D</span>
+                    </div>
+                    <ul class="nav flex-column" v-for="item in filteredHotlist">
+                        <li class="nav-item watchcard">
+                            <div class="row no-gutters bg-dark text-white">
+                                <div class="col-md-4">
+                                    <img :src="imageUrl+item.shortName+'.png'" class="card-img" :alt="item.code" style="width: 32px; height: 32px" onerror="this.style.display='none'">
+                                </div>
+                                <div class="col-md-4">
+                                    <h6 class="card-title">{{item.shortName}}</h6>
+                                </div>
+                            </div>
+
+                            <div class="row no-gutters bg-dark text-white">
+                                <div class="col-md-4">
+                                    <button class="btn btn-sm btn-primary" v-on:click="clickBuyOrSell('buy', item.ticker)">Buy</button>
+                                </div>
+                                <div class="col-md-4">
+                                    <button class="btn btn-sm btn-danger" v-on:click="clickBuyOrSell('sell', item.ticker)">Sell</button>
+                                </div>
+                            </div>
+    
+                            <div class="row no-gutters bg-dark text-white">
+                                <div class="col-md-4">
+                                    <p class="card-text">{{item.shortName}}</p>
+                                </div>
+                                <div class="col-md-4">
+                                    <p class="card-text col-md-4">{{item.holdersCount}} ({{item.delta}})</p>
+                                </div>
+                            </div>
+    
+                        </li>
+                    </ul>
+                </div>
+
+      
+              <main role="main" class="col-md-9 ml-sm-auto col-lg-10 pt-3 px-4">
+
+              </main>
+            </div>
+          </div>
+            <!-- Modals -->
+
+            <div class="modal fade" id="modifyOrderModal" tabindex="-1" role="dialog" aria-labelledby="modifyOrderModalLabel" aria-hidden="true">
+            <div class="modal-dialog" role="document">
+                <div class="modal-content bg-dark text-white">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="modifyOrderModalLabel">Modify Order</h5>
+                    <button type="button" class="close" data-dismiss="modal" aria-label="Close">
+                    <span aria-hidden="true">&times;</span>
+                    </button>
+                </div>
+                <div class="modal-body" v-if="activeOrder != null">
+                    <div class="row no-gutters">
+                        <div class="col-md-6">
+                            <p class="card-text">Ticker</p>
+                        </div>
+                        <div class="col-md-6">
+                            <p class="card-text">{{showCode(activeOrder)}}</p>
+                        </div>
+                    </div>
+                    <div class="row no-gutters">
+                        <div class="col-md-6">
+                            <p class="card-text">Order type</p>
+                        </div>
+                        <div class="col-md-6">
+                            <p class="card-text">{{activeOrder.type}} {{orderType(activeOrder)}}</p>
+                        </div>
+                    </div>
+                    <div class="row no-gutters">
+                        <div class="col-md-6">
+                            <p class="card-text">Current price</p>
+                        </div>
+                        <div class="col-md-6">
+                            <p class="card-text">{{showCurrency(activeOrder)}}{{findCurrentPriceFromWS(activeOrder)}}</p>
+                        </div>
+                    </div>
+                    <div class="row no-gutters">
+                        <div class="col-md-6">
+                            <p class="card-text">Order price</p>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="input-group mb-3">
+                                <div class="input-group-prepend">
+                                  <span class="input-group-text">{{showCurrency(activeOrder)}}</span>
+                                </div>
+                                <input type="number" class="form-control" id="order_limitprice" v-model="activeOrder.limitPrice" step="0.001" aria-label="Amount">
+                            </div>
+                        </div>
+                    </div>
+                    <div class="row no-gutters">
+                        <div class="col-md-6">
+                            <p class="card-text">Quantity</p>
+                        </div>
+                        <div class="col-md-6">
+                            <input type="number" class="form-control" id="order_quantity" class="currency" v-model="modifyOrderQuantity"></input>
+                        </div>
+                    </div>
+                    <div class="row no-gutters" v-if="activeOrder.quantity < 0">
+                        <div class="col-md-6">
+                            <p class="card-text">Available shares</p>
+                        </div>
+                        <div class="col-md-6">
+                            <p class="card-text">{{orderShowAvailable(activeOrder)}}</p>
+                        </div>
+                    </div>
+                    <div class="row no-gutters">
+                        <div class="col-md-6">
+                            <p class="card-text">Cost</p>
+                        </div>
+                        <div class="col-md-6">
+                            <p class="card-text">£{{showOrderCost(activeOrder)}}</p>
+                        </div>
+                    </div>
+                    <div class="row no-gutters bg-dark text-white" v-if="activeOrder.quantity < 0">
+                        <div class="col-md-6">
+                            <p class="card-text">Profit/Loss</p>
+                        </div>
+                        <div class="col-md-6">
+                            <p :class="'card-text '+orderResultColour(activeOrder)">£{{orderResult(activeOrder)}}</p>
+                        </div>
+                    </div>
+                    
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-dismiss="modal">Close</button>
+                    <button type="button" class="btn btn-primary" v-on:click="saveModifyOrder">Save changes</button>
+                </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="modal fade" id="buyModal" tabindex="-1" role="dialog" aria-labelledby="buyModalLabel" aria-hidden="true">
+            <div class="modal-dialog" role="document">
+                <div class="modal-content bg-dark text-white">
+
+                    <div class="modal-header">
+                        <h5 class="modal-title" id="buyModalLabel"  v-if="activeOrder != null">{{buyOrSell}} {{showCode(activeOrder)}}</h5>
+                        <button type="button" class="close" data-dismiss="modal" aria-label="Close">
+                        <span aria-hidden="true">&times;</span>
+                        </button>
+                    </div>
+                    <div class="modal-body" v-if="activeOrder != null">
+                        <div class="row no-gutters">
+                            <div class="col-md-6">
+                                <p class="card-text">Ticker</p>
+                            </div>
+                            <div class="col-md-6">
+                                <p class="card-text">{{showCode(activeOrder)}}</p>
+                            </div>
+                        </div>
+                        <div class="row no-gutters">
+                            <div class="col-md-6">
+                                <p class="card-text">Quantity</p>
+                            </div>
+                            <div class="col-md-6">
+                                <input type="number" class="form-control"  v-model="modifyOrderQuantity"></input>
+                            </div>
+                        </div>
+                        <div class="row no-gutters" v-if="activeOrder.quantity < 0">
+                            <div class="col-md-6">
+                                <p class="card-text">Available shares</p>
+                            </div>
+                            <div class="col-md-6">
+                                <p class="card-text">{{orderShowAvailable(activeOrder)}}</p>
+                            </div>
+                        </div>
+                        <div class="row no-gutters">
+                            <div class="col-md-6">
+                                <p class="card-text">Type</p>
+                            </div>
+                            <div class="col-md-6">
+                                <select v-model="activeOrder.orderType" class="form-control">
+                                    <option value="MARKET">Market</option>
+                                    <option value="LIMIT">Limit</option>
+                                </select>
+                            </div>
+                        </div>
+                        <div class="row no-gutters">
+                            <div class="col-md-6">
+                                <p class="card-text">Unit price</p>
+                            </div>
+                            <div class="col-md-6">
+                                <div class="input-group mb-3">
+                                    <div class="input-group-prepend">
+                                      <span class="input-group-text">{{showCurrency(activeOrder)}}</span>
+                                    </div>
+                                    <input type="number" class="form-control" v-model="activeOrder.limitPrice" step="0.001" aria-label="Amount">
+                                </div>
+                            </div>
+                        </div>
+                        <div class="row no-gutters" v-if="activeOrder.quantity >= 0">
+                            <div class="col-md-6">
+                                <p class="card-text">Cost</p>
+                            </div>
+                            <div class="col-md-6">
+                                <p class="card-text">£{{showOrderCost(activeOrder)}}</p>
+                            </div>
+                        </div>
+                        <div class="row no-gutters" v-if="activeOrder.quantity < 0">
+                            <div class="col-md-6">
+                                <p class="card-text">Value</p>
+                            </div>
+                            <div class="col-md-6">
+                                <p class="card-text">£{{showOrderCost(activeOrder)}}</p>
+                            </div>
+                        </div>
+                        <div class="row no-gutters" v-if="activeOrder.quantity < 0">
+                            <div class="col-md-6">
+                                <p class="card-text">Profit/Loss</p>
+                            </div>
+                            <div class="col-md-6">
+                                <p class="card-text">£{{orderResult(activeOrder)}}</p>
+                            </div>
+                        </div>
+                    
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-dismiss="modal">Close</button>
+                    <button type="button" class="btn btn-primary" v-on:click="saveOrder">Save changes</button>
+                </div>
+                </div>
+            </div>
+        </div>
+    </div>
+   
+
+    <!-- Icons -->
+    <script src="https://unpkg.com/feather-icons/dist/feather.min.js"></script>
+    <script>
+      feather.replace()
+    </script>
+
+    <!-- Graphs -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/2.7.1/Chart.min.js"></script>
+    <script>
+        /*
+      var ctx = document.getElementById("myChart");
+      var myChart = new Chart(ctx, {
+        type: 'line',
+        data: {
+          labels: ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"],
+          datasets: [{
+            data: [15339, 21345, 18483, 24003, 23489, 24092, 12034],
+            lineTension: 0,
+            backgroundColor: 'transparent',
+            borderColor: '#007bff',
+            borderWidth: 4,
+            pointBackgroundColor: '#007bff'
+          }]
+        },
+        options: {
+          scales: {
+            yAxes: [{
+              ticks: {
+                beginAtZero: false
+              }
+            }]
+          },
+          legend: {
+            display: false,
+          }
+        }
+      });*/
+    </script>
+  </body>
+    
+<script src="client.js"></script>
+<script>
+    var vue = new Vue({
+        el: '#main-app',
+        data: {
+            imageUrl: 'https://trading212equities.s3.eu-central-1.amazonaws.com/',
+            portfolio: null,
+            hotlistPeriod: ["hourly", 8],
+            hotlist: {
+                hourly: [],
+                daily: [],
+            },
+            orders: null,
+            forex: 0,
+            activeOrder: null,
+            modifyOrder: null,
+            rerender: 0,
+            equityBidAskPrices: [],
+            filter: {
+                positions: "",
+                orders: "",
+                hotlist: "",
+            }
+        },
+        computed: {
+            filteredPortfolio: function() {
+                if(this.filter.positions == "") {
+                    return this.portfolio;
+                }
+                return this.portfolio.filter(item => {
+                    return item.code.replace('US_EQ', '').replace('l_EQ', '').replace('LN_EQ', '').replace('_', '').toUpperCase().includes(this.filter.positions.toUpperCase());
+                });
+                //filteredPortfolio
+            },
+            filteredOrders: function() {
+                if(this.filter.orders == "") {
+                    return this.orders;
+                }
+                return this.orders.filter(item => {
+                    return item.code.replace('US_EQ', '').replace('l_EQ', '').replace('LN_EQ', '').replace('_', '').toUpperCase().includes(this.filter.orders.toUpperCase());
+                });
+                //filteredPortfolio
+            },
+            filteredHotlist: function() {
+                let hotlistPeriod = this.hotlistPeriod[0];
+                let hotlistRange = this.hotlistPeriod[1];
+                if(this.filter.hotlist == "") {
+                    return this.hotlist[hotlistPeriod][hotlistRange];
+                }
+                return this.hotlist[1].filter(item => {
+                    return item.shortName.replace('US_EQ', '').replace('l_EQ', '').replace('LN_EQ', '').replace('_', '').toUpperCase().includes(this.filter.hotlist.toUpperCase());
+                });
+                //filteredPortfolio
+            },
+            modifyOrderQuantity: {
+                get() {
+                    let quantity = this.modifyOrder.quantity;
+                    if(quantity < 0) {
+                        return quantity * -1;
+                    }
+                    return quantity;
+                },
+                set(newValue) {
+                    let quantity = newValue;
+                    if(this.modifyOrder.quantity < 0) {
+                        this.modifyOrder.quantity = quantity * -1;
+                    } else {
+                        this.modifyOrder.quantity = quantity;
+                    }
+                },
+            },
+            buyOrSell: function() {
+                if(this.activeOrder.quantity < 0) return 'Sell';
+                return 'Buy';
+            },
+        },
+        methods: {
+            hotlistActiveClass: function(period, range) {
+                if(this.hotlistPeriod[0] == period && this.hotlistPeriod[1] == range) {
+                    return " hotlistActive";
+                }
+                return "";
+            },
+            setHotlistFilter: function(period, range) {
+                this.hotlistPeriod = [period, range];
+            },
+            orderType: function(order) {
+                if(order.quantity > 0) {
+                    return 'Buy';
+                }
+                return 'Sell';
+            },
+            showCode: function(item) {
+                //return item.code;
+                return item.code.replace('US_EQ', '').replace('l_EQ', '').replace('LN_EQ', '').replace('_', '');
+            },
+            findSellItem: function(item) {
+                for(var i = 0; i < this.portfolio.length; i++) {
+                    let portfolioItem = this.portfolio[i];
+                    if(portfolioItem.code == item.code) {
+                        return portfolioItem;
+                    }
+                }
+            },
+            findCurrentPriceFromWS: function(item) {
+                for(var i = 0; i < this.equityBidAskPrices.length; i++) {
+                    let bidAskItem = this.equityBidAskPrices[i];
+                    if(bidAskItem.ticker == item.code) {
+                        return bidAskItem.ask;
+                    }
+                }
+                return this.findCurrentPrice(item);
+            },
+            findCurrentPrice: function(item) {
+                for(var i = 0; i < this.portfolio.length; i++) {
+                    let portfolioItem = this.portfolio[i];
+                    if(portfolioItem.code == item.code) {
+                        return portfolioItem.currentPrice;
+                    }
+                }
+                return 0;
+            },
+            isUSEQ: function(item) {
+                return item.code.includes('US_EQ');
+            },
+            showCurrency: function(item) {
+                if(item.code.includes('US_EQ')) {
+                    return '$';
+                }
+                return '£';
+            },
+            sellResult: function(item) {
+                return parseFloat(item.value - item.investment).toFixed(3);
+            },
+            sellResultColour: function(item) {
+                let result = item.value - item.investment;
+                if(result == 0) return 'neutral';
+                if(result > 0) return 'profit';
+                return 'loss';
+            },
+            orderShowQuantity: function(item) {
+                let quantity = JSON.parse(JSON.stringify(item.quantity));
+                if(quantity < 0) {
+                    return quantity *= -1;
+                }
+                return quantity;
+            },
+            orderResult: function(item) {
+                let quantity = JSON.parse(JSON.stringify(item.quantity));
+
+                if(quantity > 0) {
+                    let result = item.limitPrice * quantity;
+                    if(!this.isUSEQ(item)) {
+                        result /= 100;
+                    } else {
+                        result /= this.forex;
+                    }
+                    return parseFloat(result).toFixed(2);
+                }
+
+                if(quantity < 0) quantity *= -1;
+                let result = item.limitPrice * quantity;
+                if(!this.isUSEQ(item)) {
+                    result /= 100;
+                }
+                var sellItem = this.findSellItem(item);
+                if(sellItem != null) sellItem = JSON.parse(JSON.stringify(sellItem));
+                else sellItem = { investment: 0, averagePriceConverted: 0 };
+                if(sellItem.investment != 0 && !this.isUSEQ(sellItem)) {
+                    sellItem.investment /= 100;
+                } else {
+                    result /= this.forex;
+                }
+
+                result = parseFloat(result - sellItem.averagePriceConverted * quantity).toFixed(2);
+                
+                return result;
+            },
+            orderResultColour: function(item) {
+                if(item.quantity > 0) return 'loss';
+                let result = this.orderResult(item);
+                if(result == 0) return 'neutral';
+                if(result > 0) return 'profit';
+                return 'loss';
+            },
+            deleteOrder: function(item) {
+                socket.emit('deleteOrder', item.orderId);
+            },
+            showModifyOrder: function(item) {
+                this.activeOrder = item;
+                this.modifyOrder = JSON.parse(JSON.stringify(item));
+                $('#modifyOrderModal').modal('show');
+                this.$forceUpdate();
+            },
+            clickBuyOrSell: function(action, code) {
+                this.activeOrder = { code: code, orderType: "LIMIT", stopPrice: null, limitPrice: 0, quantity: 1, timeValidity: 'DAY' };
+                if(action == "sell") {
+                    this.activeOrder.quantity *= -1;
+                }
+                var sellItem = this.findSellItem(this.activeOrder);
+                if(sellItem != null) {
+                    this.activeOrder.limitPrice = sellItem.currentPrice;
+                }
+                this.modifyOrder = this.activeOrder;
+                $('#buyModal').modal('show');
+            },
+            orderShowAvailable: function(item) {
+                let portfolioItem = this.findSellItem(item);
+                if(portfolioItem == null) return 0;
+                let pendingOrderShares = this.getTotalPendingSellCount(item);
+                return portfolioItem.quantity - pendingOrderShares;
+            },
+            getTotalPendingSellCount: function(item) {
+                var sellCount = 0;
+                for(var i = 0; i < this.orders.length; i++) {
+                    let order = this.orders[i];
+                    if(order.code == item.code && order.quantity < 0) {
+                        sellCount += (order.quantity * -1);
+                    }
+                }
+                return sellCount;
+            },
+            saveOrder: function() {
+                socket.emit('placeOrder', this.activeOrder);
+            },
+            saveModifyOrder: function() {
+                socket.emit('modifyOrder', this.activeOrder);
+                console.log(this.activeOrder);
+            },
+            showOrderCost: function() {
+                let result = 0
+                if(this.activeOrder.quantity > 0) result = this.activeOrder.limitPrice * this.activeOrder.quantity;
+                else result = this.activeOrder.limitPrice * (this.activeOrder.quantity * -1);
+                if(this.isUSEQ(this.activeOrder)) {
+                    result /= this.forex;;
+                }
+                return parseFloat(result).toFixed(2);
+            },
+            modifyOrderResult: function() {
+                var sellItem = this.findSellItem(this.modifyOrder);
+                if(sellItem == null) return 0;
+                sellItem = JSON.parse(JSON.stringify(sellItem));
+                let quantity = JSON.parse(JSON.stringify(this.modifyOrder.quantity));
+                if(quantity < 0) quantity *= -1;
+                let result = this.modifyOrder.limitPrice * quantity;
+                if(!this.isUSEQ(sellItem)) {
+                    sellItem.investment /= 100;
+                } else {
+                    result /= this.forex;
+                }
+                result = parseFloat(result - sellItem.averagePriceConverted * quantity).toFixed(2);
+                return result;
+            },
+            setEquityBidAsk: function(equityBidAsk) {
+                for(var i = 0; i < this.equityBidAskPrices.length; i++) {
+                    var equity = this.equityBidAskPrices[i];
+                    if(equityBidAsk.ticker == equity.ticker) {
+                        this.$set(this.equityBidAskPrices, i, equityBidAsk);
+                        return;
+                    }
+                }
+                this.$set(this.equityBidAskPrices, this.equityBidAskPrices.length, equityBidAsk);
+            }
+        }
+
+    });
+
+    var wsAccount = {};
+    var wsAccountRe = {};
+
+    var socket = io();
+    socket.on('account', data => {
+        console.log(data);
+        wsAccount = data;
+        vue.portfolio = data.positions;
+        vue.orders = data.equityOrders;
+    })
+
+    socket.on('hotlist', data => {
+        console.log(data);
+        vue.hotlist = data;
+    })
+
+    socket.on('reaccount', data => {
+        //console.log("re data");
+        //console.log(data);
+        wsAccountRe = data;
+        vue.portfolio = data.open.items;
+        vue.orders = data.orders.items;
+    })
+
+
+    socket.on('price', data => {
+        //console.log(data);
+        vue.setEquityBidAsk(data);
+    });
+
+    socket.on('forex', data => {
+        vue.forex = data;
+    })
+</script>
+
+
+
+</body>
+<script src="https://code.jquery.com/jquery-3.5.1.js" integrity="sha256-QWo7LDvxbWT2tbbQ97B53yJnYU3WhH/C8ycbRAkjPDc=" crossorigin="anonymous"></script>
+<script src="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/js/bootstrap.min.js"></script>
+
+</html>
