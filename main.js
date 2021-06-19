@@ -50,8 +50,8 @@ var hotlist = {
 var subscribedSymbols = [];
 var equityData = [];
 
-var trading212Handler = require('trading212');
-var trading212 = new trading212Handler('live', CUSTOMER_SESSION, TRADING212_SESSION_LIVE);
+var { trading212 } = require('trading212');
+var trading212 = new trading212('live', CUSTOMER_SESSION, TRADING212_SESSION_LIVE);
 
 trading212.on('connection-established', () => {
     trading212.getExchangeRate();
