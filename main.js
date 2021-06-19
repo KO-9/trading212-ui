@@ -53,10 +53,13 @@ var equityData = [];
 var trading212Handler = require('trading212');
 var trading212 = new trading212Handler('live', CUSTOMER_SESSION, TRADING212_SESSION_LIVE);
 
+trading212.on('connection-established', () => {
+    trading212.getExchangeRate();
+});
+
 trading212.on('platform-subscribed', () => {
     console.log('wee event emitted');
     trading212.getAvailableEquities();
-    trading212.getCurrentPrice(["CFFA_US_EQ"]);
     refreshHotlist();
     setInterval(refreshHotlist, 20 * 1000);
 })
@@ -74,6 +77,9 @@ trading212.on('equity-data', (data) => {
 });
 
 trading212.on('account', (data) => {
+    if(data.hasOwnProperty("account")) {
+        data = data.account;
+    }
     wsAccount = data;
     var toSubscribe = [];
     for(var i = 0; i < data.positions.length; i++) {
@@ -138,6 +144,6 @@ trading212.on('price', (data) => {
 })
 
 trading212.on('forex', (data) => {
-    GBP_TO_USD = data.rates.USD;
+    GBP_TO_USD = data.quoteSummary.result[0].price.regularMarketPrice.raw;
     io.emit('forex', GBP_TO_USD);
 })
