@@ -5,8 +5,9 @@ const http = require('http').Server(app);
 const io = require('socket.io')(http);
 let CUSTOMER_SESSION = process.env.CUSTOMER_SESSION;
 let TRADING212_SESSION_LIVE = process.env.TRADING212_SESSION_LIVE;
+let HTTP_PORT = process.env.HTTP_PORT;
 
-// viewed at http://localhost:8080
+// viewed at http://localhost:HTTP_PORT
 app.get('/', function(req, res) {
     res.sendFile(path.join(__dirname + '/index.html'));
 });
@@ -15,12 +16,24 @@ app.get('/client.js', function(req, res) {
     res.sendFile(path.join(__dirname + '/node_modules/socket.io-client/dist/socket.io.js'));
 });
 
-http.listen(3456, () => {
-    console.log('listening on *:3456');
+http.listen(HTTP_PORT, () => {
+    console.log('listening on *:'+HTTP_PORT);
 });
+
+function testStopLimitOrder() {
+    let symbol = "GME_US_EQ";
+    let orderType = "STOP_LIMIT";
+    let quantity = -1;//Minus how ever many you wish to sell
+    let limitPrice = 203; //Set limit sell at this price
+    let stopPrice = 205; //Limit order is only placed on market when price is at or below this price
+    let timeValidity = "DAY"; // Or "GOOD_TILL_CANCEL"
+
+    trading212.placeOrder(symbol, orderType, stopPrice, limitPrice, quantity, timeValidity);
+}
 
 io.on('connection', (socket) => {
     console.log('a user connected');
+    io.emit('trading212-connection', trading212_status);
     io.emit('account', wsAccount);
     io.emit('reaccount', wsAccountRe);
     io.emit('hotlist', hotlist);
@@ -30,12 +43,14 @@ io.on('connection', (socket) => {
     });
     socket.on('placeOrder', (order) => {
         console.log(order);
-        trading212.placeOrder(order.code, order.orderType, order.stopPrice, order.limitPrice, order.quantity, order.timeValidity)
+        
+        trading212.validateOrder(order.code, order.orderType, order.stopPrice, order.limitPrice, order.quantity, order.timeValidity).then(res => {
+            console.log(' ordervalidated');
+            trading212.placeOrder(order.code, order.orderType, order.stopPrice, order.limitPrice, order.quantity, order.timeValidity);
+        }).catch(err => {
+            console.log(err);
+        });
     });
-    socket.on('modifyOrder', (order) => {
-        console.log(order);
-        trading212.modifyOrder(order.orderId, order.orderType, order.stopPrice, order.limitPrice, order.quantity, order.timeValidity)
-    })
 });
 
 //Account/Stock data
@@ -49,6 +64,7 @@ var hotlist = {
 };
 var subscribedSymbols = [];
 var equityData = [];
+var trading212_status = 0;
 
 var trading212Handler = require('trading212');
 var trading212 = new trading212Handler('live', CUSTOMER_SESSION, TRADING212_SESSION_LIVE);
@@ -59,6 +75,8 @@ trading212.on('connection-established', () => {
 
 trading212.on('platform-subscribed', () => {
     console.log('wee event emitted');
+    trading212_status = 1;
+    io.emit('trading212-connection', trading212_status)
     trading212.getAvailableEquities();
     refreshHotlist();
     setInterval(refreshHotlist, 20 * 1000);
@@ -71,6 +89,11 @@ function refreshHotlist() {
     trading212.getHotlist('daily', 1);
     trading212.getHotlist('daily', 30);
 }
+
+trading212.on('trading212-ws-closed', (data) => {
+    trading212_status = 0;
+    io.emit('trading212-connection', trading212_status);
+});
 
 trading212.on('equity-data', (data) => {
     equityData = data;
@@ -122,7 +145,6 @@ trading212.on('reaccount', (data) => {
         trading212.bulkSubscribe(toSubscribe);
         subscribedSymbols.push(...toSubscribe);
     }
-    
     io.emit('reaccount', wsAccountRe);
 })
 
