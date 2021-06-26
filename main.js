@@ -20,17 +20,6 @@ http.listen(HTTP_PORT, () => {
     console.log('listening on *:'+HTTP_PORT);
 });
 
-function testStopLimitOrder() {
-    let symbol = "GME_US_EQ";
-    let orderType = "STOP_LIMIT";
-    let quantity = -1;//Minus how ever many you wish to sell
-    let limitPrice = 203; //Set limit sell at this price
-    let stopPrice = 205; //Limit order is only placed on market when price is at or below this price
-    let timeValidity = "DAY"; // Or "GOOD_TILL_CANCEL"
-
-    trading212.placeOrder(symbol, orderType, stopPrice, limitPrice, quantity, timeValidity);
-}
-
 io.on('connection', (socket) => {
     console.log('a user connected');
     io.emit('trading212-connection', trading212_status);
